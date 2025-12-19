@@ -49,3 +49,56 @@ type JsdelivrLinks struct {
 	Stats       string `json:"stats"`       // URL to package stats endpoint
 	Entrypoints string `json:"entrypoints"` // URL to package entrypoints endpoint
 }
+
+// CdnjsLibraryResponse represents the response from https://api.cdnjs.com/libraries/{library}
+// This endpoint returns library information including all available versions
+type CdnjsLibraryResponse struct {
+	Name        string   `json:"name"`
+	Latest      string   `json:"latest"`      // URL to latest version
+	Version     string   `json:"version"`     // Latest version number
+	Description string   `json:"description"` // Package description
+	Homepage    string   `json:"homepage"`    // Project homepage URL
+	Repository  struct {
+		Type string `json:"type"` // Repository type (e.g., "git")
+		URL  string `json:"url"`  // Repository URL
+	} `json:"repository"`
+	Versions []string `json:"versions"` // All available versions
+}
+
+// JsdelivrVersionsResponse represents the response from https://data.jsdelivr.com/v1/packages/npm/{library}
+// This endpoint returns package information including available versions
+type JsdelivrVersionsResponse struct {
+	Type     string                 `json:"type"`     // Package type (e.g., "npm")
+	Name     string                 `json:"name"`     // Package name
+	Tags     map[string]string      `json:"tags"`     // Version tags (e.g., "latest": "1.2.3")
+	Versions []JsdelivrVersionInfo  `json:"versions"` // Available versions
+	Links    JsdelivrVersionsLinks  `json:"links"`    // Related API endpoints
+}
+
+// JsdelivrVersionInfo represents version information in jsDelivr response
+type JsdelivrVersionInfo struct {
+	Version string                `json:"version"` // Version number
+	Links   JsdelivrVersionLinks  `json:"links"`   // Links to version-specific endpoints
+}
+
+// JsdelivrVersionLinks contains URLs to version-specific jsDelivr endpoints
+type JsdelivrVersionLinks struct {
+	Self string `json:"self"` // URL to this version's endpoint
+	Stats string `json:"stats,omitempty"` // URL to version stats
+}
+
+// JsdelivrVersionsLinks contains URLs to package-level jsDelivr endpoints
+type JsdelivrVersionsLinks struct {
+	Self string `json:"self"` // URL to this package's endpoint
+}
+
+// UnpkgPackageResponse represents the response from https://registry.npmjs.org/{package}
+// UNPKG doesn't have its own versions API, so we use npm registry
+type UnpkgPackageResponse struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	DistTags    map[string]string `json:"dist-tags"` // Version tags (e.g., "latest": "1.2.3")
+	Versions    map[string]struct {
+		Version string `json:"version"`
+	} `json:"versions"` // Map of version number to version info
+}

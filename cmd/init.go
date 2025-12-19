@@ -5,9 +5,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
+
+var forceOverwrite bool
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
@@ -24,14 +28,30 @@ and where to store them locally. Once initialized, you can add libraries with th
 
 Example:
   smfaman init
-  smfaman init -f myproject.yaml`,
+  smfaman init -f myproject.yaml
+  smfaman init --force  # Overwrite existing config`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called")
+		// Check if config file already exists
+		if _, err := os.Stat(FrontendConfig); err == nil && !forceOverwrite {
+			fmt.Printf("Error: %s already exists\n", FrontendConfig)
+			fmt.Println("Remove the existing file, use a different name with -f flag, or use --force to overwrite")
+			os.Exit(1)
+		}
+
+		// Create and run the Bubble Tea program
+		p := tea.NewProgram(newInitModel(FrontendConfig))
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error running init: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+
+	// Add force flag
+	initCmd.Flags().BoolVar(&forceOverwrite, "force", false, "Overwrite existing config file if it exists")
 
 	// Here you will define your flags and configuration settings.
 

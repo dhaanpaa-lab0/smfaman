@@ -9,9 +9,12 @@ A CLI tool for managing frontend assets from CDNs when you don't need bundling o
 - 🚀 Fetch frontend libraries from multiple CDNs
 - 🔒 Automatic SRI (Subresource Integrity) hash verification
 - 📦 Support for three major CDNs: jsDelivr, UNPKG, and CDNJS
-- 🔍 Browse available files and versions
+- 🔍 Browse available files and versions interactively
 - ⚡ Fast and lightweight - no Node.js required
 - 📝 Simple YAML configuration
+- 💾 Local cache for CDN metadata (24-hour TTL)
+- 🎨 Beautiful interactive TUI with progress bars
+- 🔄 Smart sync - only downloads missing files
 
 ## Supported CDNs
 
@@ -43,11 +46,17 @@ go install nexus-sds.com/smfaman@latest
 ## Quick Start
 
 ```bash
-# Initialize a new frontend config
+# Initialize a new frontend config (interactive)
 smfaman init
 
 # Add a library to your configuration
 smfaman add bootstrap@5.3.0
+
+# Or use interactive version selector
+smfaman add react --interactive
+
+# List available versions for a package
+smfaman pkgver jquery
 
 # Sync all configured libraries to local directory
 smfaman sync
@@ -59,30 +68,154 @@ smfaman -f myproject.yaml sync
 ## Commands
 
 ### `init`
-Create a new smart frontend asset configuration file.
+Create a new smart frontend asset configuration file interactively.
 
 ```bash
+# Interactive mode (default)
 smfaman init
+
+# Force overwrite existing config
+smfaman init --force
 ```
 
-Creates `smartfrontend.yaml` in the current directory.
+Creates `smartfrontend.yaml` in the current directory with:
+- Project name
+- Destination path with `{library_name}` template
+- Default CDN selection (unpkg, cdnjs, jsdelivr)
 
 ### `add`
-Add a new library to the configuration.
+Add a new library to the configuration with version validation.
 
 ```bash
-smfaman add <library>@<version>
+# Add with specific version
 smfaman add bootstrap@5.3.0
-smfaman add react@18.2.0
+
+# Interactive version selector
+smfaman add react --interactive
+smfaman add react -i
+
+# Add with custom CDN
+smfaman add jquery@3.7.1 --cdn cdnjs
+
+# Add with specific files only
+smfaman add bootstrap --files "dist/css/bootstrap.min.css" --files "dist/js/bootstrap.bundle.min.js"
+
+# Add with custom output path
+smfaman add lodash --output "./custom/lodash"
+
+# Force overwrite if library exists
+smfaman add react@18.2.0 --force
 ```
+
+**Features:**
+- Validates version exists on CDN before adding
+- Supports scoped packages: `@babel/core@7.22.0`
+- Uses latest version if not specified
+- Interactive mode for browsing all available versions
+
+### `pkgver`
+List and browse available versions for a package from CDN.
+
+```bash
+# List versions (shows 20 most recent)
+smfaman pkgver react
+
+# Show more versions
+smfaman pkgver react --limit 50
+
+# Interactive mode with search/filter
+smfaman pkgver react --interactive
+smfaman pkgver react -i
+
+# Use specific CDN
+smfaman pkgver bootstrap --cdn cdnjs
+
+# Bypass cache
+smfaman pkgver jquery --no-cache
+```
+
+**Interactive mode:**
+- Browse all versions with arrow keys
+- Search/filter with `/`
+- Shows which version is latest
+- Press Enter to select (displays helpful command)
 
 ### `sync`
-Download libraries defined in the configuration file but not present locally.
+Download libraries defined in the configuration file.
 
 ```bash
+# Sync all libraries
 smfaman sync
-smfaman -f custom-config.yaml sync
+
+# Force re-download all files
+smfaman sync --force
+
+# Preview what would be downloaded
+smfaman sync --dry-run
+
+# Use custom config
+smfaman -f myproject.yaml sync
 ```
+
+**Features:**
+- Smart incremental sync (only downloads missing files)
+- Real-time progress bars for each download
+- Respects library-specific file filters
+- Creates destination directories automatically
+- Uses cached CDN metadata for speed
+
+**Progress Display:**
+```
+Syncing libraries... [3/15 files]
+
+Library: jquery@3.7.1
+File:    dist/jquery.min.js
+
+[████████████████████░░░░░░░░░░░░░░░░░░░░] 52.5%
+```
+
+### `get`
+Download a frontend config from a remote HTTP server.
+
+```bash
+# Download config from URL
+smfaman get https://example.com/frontend.yaml
+
+# Download to custom file
+smfaman get https://example.com/config.yaml -f myproject.yaml
+
+# Force overwrite existing file
+smfaman get https://example.com/frontend.yaml --force
+
+# Set timeout (default: 30s)
+smfaman get https://slow-server.com/config.yaml --timeout 60
+```
+
+**Features:**
+- Validates YAML structure before saving
+- Checks required fields (destination, libraries)
+- Shows config summary after download
+- Suggests next steps (review, sync)
+
+### `cache`
+Manage local cache for CDN metadata.
+
+```bash
+# Show cache statistics
+smfaman cache stats
+
+# Clear all cached data
+smfaman cache clear
+
+# Remove only expired entries
+smfaman cache clean
+```
+
+**Cache Details:**
+- Location: `~/.smfaman-cache/`
+- Default TTL: 24 hours
+- Automatic cleanup on expiration
+- Speeds up repeated operations
 
 ## Configuration
 
@@ -91,31 +224,40 @@ The default configuration file is `smartfrontend.yaml`. You can specify a differ
 ### Example Configuration
 
 ```yaml
+destination: "./public/libs/{library_name}"
+project_name: "my-awesome-project"
+cdn: "unpkg"  # Default CDN for all libraries
+
 libraries:
-  - name: bootstrap
-    version: 5.3.0
-    cdn: jsdelivr
-    files:
-      - dist/css/bootstrap.min.css
-      - dist/js/bootstrap.bundle.min.js
+  jquery:
+    version: "3.7.1"
 
-  - name: react
-    version: 18.2.0
-    cdn: unpkg
+  bootstrap:
+    version: "5.3.0"
+    cdn: "cdnjs"  # Override global CDN for this library
     files:
-      - umd/react.production.min.js
-      - umd/react-dom.production.min.js
+      - "css/bootstrap.min.css"
+      - "js/bootstrap.bundle.min.js"
 
-  - name: jquery
-    version: 3.7.1
-    cdn: cdnjs
+  react:
+    version: "18.2.0"
     files:
-      - jquery.min.js
-
-output:
-  directory: ./public/vendor
-  integrity: true  # Generate SRI hashes
+      - "umd/react.production.min.js"
+    output_path: "./custom/react"  # Custom output directory
 ```
+
+### Configuration Fields
+
+**Global Fields:**
+- `destination` (required): Output path template, use `{library_name}` placeholder
+- `project_name` (optional): Project identifier
+- `cdn` (optional): Default CDN (unpkg, cdnjs, jsdelivr)
+
+**Library Fields:**
+- `version` (required): Specific version to download
+- `cdn` (optional): Override global CDN for this library
+- `files` (optional): Specific files to download (supports patterns)
+- `output_path` (optional): Custom output path (overrides destination template)
 
 ## Global Configuration
 
@@ -132,7 +274,7 @@ verify_ssl: true
 ### Example 1: Simple Bootstrap Project
 
 ```bash
-# Initialize config
+# Initialize config interactively
 smfaman init
 
 # Add Bootstrap CSS framework
@@ -145,29 +287,60 @@ smfaman sync
 ### Example 2: React Application
 
 ```bash
-# Add React and ReactDOM
-smfaman add react@18.2.0
-smfaman add react-dom@18.2.0
+# Initialize
+smfaman init
+
+# Add React and ReactDOM interactively
+smfaman add react -i
+smfaman add react-dom -i
 
 # Sync all libraries
 smfaman sync
 ```
 
-### Example 3: Using Multiple CDNs
+### Example 3: Exploring Versions
+
+```bash
+# Browse jQuery versions interactively
+smfaman pkgver jquery -i
+
+# Check latest React version
+smfaman pkgver react --limit 5
+
+# Compare versions across CDNs
+smfaman pkgver bootstrap --cdn unpkg
+smfaman pkgver bootstrap --cdn cdnjs
+smfaman pkgver bootstrap --cdn jsdelivr
+```
+
+### Example 4: Team Configuration Sharing
+
+```bash
+# On machine 1: Create and configure
+smfaman init
+smfaman add bootstrap@5.3.0
+smfaman add jquery@3.7.1
+
+# Upload smartfrontend.yaml to your server
+# On machine 2: Download and sync
+smfaman get https://yourserver.com/smartfrontend.yaml
+smfaman sync
+```
+
+### Example 5: Custom File Selection
 
 ```yaml
+# Only download minified files
 libraries:
-  - name: bootstrap
-    version: 5.3.0
-    cdn: jsdelivr  # Fastest for Bootstrap
+  lodash:
+    version: "4.17.21"
+    files:
+      - "lodash.min.js"  # Exact match
 
-  - name: lodash
-    version: 4.17.21
-    cdn: unpkg     # Good metadata
-
-  - name: jquery
-    version: 3.7.1
-    cdn: cdnjs     # Reliable jQuery host
+  bootstrap:
+    version: "5.3.0"
+    files:
+      - "dist/css/"  # Prefix match - all files in dist/css/
 ```
 
 ## API Integration
@@ -182,6 +355,8 @@ Each CDN provides different metadata:
 - **UNPKG**: File paths, sizes, MIME types, and integrity hashes
 - **CDNJS**: File lists with comprehensive SRI hash mappings
 - **jsDelivr**: Hierarchical file tree with default entry points
+
+**All API calls are cached locally for 24 hours to improve performance.**
 
 ## Development
 
@@ -203,6 +378,9 @@ go test ./... -v
 # Test specific package
 go test ./pkgs/frontend_mgr -v
 
+# Test specific command
+go test ./cmd -v -run TestAdd
+
 # Run benchmarks
 go test ./pkgs/frontend_mgr -bench=.
 ```
@@ -213,22 +391,40 @@ go test ./pkgs/frontend_mgr -bench=.
 smfaman/
 ├── cmd/                    # CLI commands (Cobra)
 │   ├── root.go            # Root command and config
-│   ├── init.go            # Initialize config file
+│   ├── init.go            # Initialize config file (interactive TUI)
+│   ├── init_tui.go        # Bubble Tea UI for init
 │   ├── add.go             # Add library command
-│   └── sync.go            # Sync libraries command
+│   ├── add_test.go        # Add command tests
+│   ├── sync.go            # Sync libraries command
+│   ├── sync_test.go       # Sync command tests
+│   ├── pkgver.go          # List package versions
+│   ├── pkgver_tui.go      # Interactive version selector
+│   ├── get.go             # Download remote config
+│   ├── get_test.go        # Get command tests
+│   └── cache.go           # Cache management commands
 ├── pkgs/
 │   ├── frontend_mgr/      # CDN API integration
 │   │   ├── requests.go    # HTTP client functions
 │   │   ├── responses.go   # Response structures
+│   │   ├── versions.go    # Version fetching/sorting
 │   │   └── *_test.go      # Test files
-│   └── frontend_config/   # Configuration management
+│   ├── frontend_config/   # Configuration management
+│   │   ├── cfg.go         # Config structs and methods
+│   │   └── cfg_test.go    # Config tests
+│   └── cache/             # Cache management
+│       ├── cache.go       # Cache implementation
+│       └── cache_test.go  # Cache tests
+├── examples/
+│   └── frontend.yaml      # Example configuration
 ├── main.go                # Entry point
-└── go.mod                 # Go modules
+├── go.mod                 # Go modules
+├── README.md              # This file
+└── CLAUDE.md              # Development guide for Claude Code
 ```
 
 ## Requirements
 
-- Go 1.25.4 or higher
+- Go 1.21 or higher
 - Internet connection (for CDN access)
 
 ## License
@@ -259,13 +455,32 @@ Contributions are welcome from both humans and AI agents (Especially Claude Code
 
 ## Roadmap
 
-- [ ] Implement library version resolution (latest, semver ranges)
+- [x] Implement library version resolution (latest, semver ranges)
+- [x] Interactive mode for browsing available files
+- [x] Local cache for CDN metadata
+- [x] Progress bars for downloads
 - [ ] Add update command to check for library updates
 - [ ] Support for GitHub releases as a source
 - [ ] Parallel downloads for faster syncing
 - [ ] Generate HTML import tags with SRI hashes
-- [ ] Interactive mode for browsing available files
-- [ ] Local cache for CDN metadata
+- [ ] Integrity verification during download
+
+## Inspiration
+- Microsoft LibMan: https://github.com/microsoft/libman
+
+## Notes
+- This project is not affiliated with any CDN providers.
+
+## Project Goals
+- To provide a simple CLI tool for managing frontend assets from CDNs.
+- To be lightweight and fast.
+- To be easy to use and extend.
+- This is not a replacement for bundlers like Webpack or Parcel.
+- This is not a replacement for package managers like npm or Yarn.
+- This is not a replacement for vite
+- To be awesome
+- To spark joy
+
 
 ## Support
 
