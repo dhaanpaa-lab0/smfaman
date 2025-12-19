@@ -30,11 +30,12 @@ import (
 )
 
 var cfgFile string
+var FrontendConfig string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "smfaman",
-	Short: "A brief description of your application",
+	Short: "Smart Frontend Asset Manager",
 	Long: `A longer description that spans multiple lines and likely contains
 examples and usage of using your application. For example:
 
@@ -63,7 +64,7 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.smfaman.yaml)")
-
+	rootCmd.PersistentFlags().StringVarP(&FrontendConfig, "frontend-config", "f", "smartfrontend.yaml", "frontend configuration file")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")

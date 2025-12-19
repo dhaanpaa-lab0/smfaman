@@ -1,0 +1,9 @@
+destination: "./frontend/{library_name}"
+cdn:
+  jsdelivr: "https://cdn.jsdelivr.net/npm/{library_name}@{version}/dist/{library_name}.min.js"
+  unpkg: "https://unpkg.com/{library_name}@{version}/dist/{library_name}.min.js"
+  cdnjs: "https://cdnjs.cloudflare.com/ajax/libs/{library_name}/{version}/{library_name}.min.js"
+
+libraries:
+  jquery:
+    version: "3.5.1"
