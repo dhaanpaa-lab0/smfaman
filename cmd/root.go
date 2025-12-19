@@ -36,12 +36,18 @@ var FrontendConfig string
 var rootCmd = &cobra.Command{
 	Use:   "smfaman",
 	Short: "Smart Frontend Asset Manager",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Long: `Smart Frontend Asset Manager (smfaman) is a CLI tool for managing frontend
+assets from CDNs (jsDelivr, UNPKG, CDNJS) when you don't need bundling or the
+full infrastructure of a JavaScript SPA.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+smfaman helps you:
+  - Maintain a declarative configuration of frontend libraries
+  - Download and cache assets from multiple CDN providers
+  - Keep your frontend dependencies organized and version-controlled
+  - Work with frontend libraries without npm/yarn overhead
+
+Use the --frontend-config flag to specify your configuration file (default: smartfrontend.yaml).
+The global configuration file is stored at $HOME/.smfaman.yaml.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },

@@ -13,12 +13,20 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Download libraries that are defined in the configuration file but not present locally",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Synchronize your local frontend assets with the configuration file.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+This command reads your frontend configuration file and downloads any libraries
+that are defined but not yet present locally. It will:
+  - Check which libraries are defined in the configuration
+  - Verify which ones are missing or outdated locally
+  - Download missing assets from the specified CDN (jsDelivr, UNPKG, or CDNJS)
+  - Verify integrity using SRI hashes where available
+
+This is useful after cloning a project or updating the configuration file.
+
+Example:
+  smfaman sync
+  smfaman sync -f myproject.yaml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("sync called")
 		fmt.Println(FrontendConfig)

@@ -13,12 +13,19 @@ import (
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add new library to the Smart Frontend Asset Manager Configuration",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Add a new frontend library to your configuration file.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+This command adds a library entry to your frontend configuration, specifying
+which CDN to use (jsDelivr, UNPKG, or CDNJS), the library name, version, and
+where to store it locally.
+
+The library will be added to the configuration file but not downloaded until
+you run 'smfaman sync'.
+
+Example:
+  smfaman add bootstrap@5.3.0
+  smfaman add react@18.2.0 --cdn unpkg
+  smfaman add -f myproject.yaml lodash@4.17.21`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("add called")
 	},

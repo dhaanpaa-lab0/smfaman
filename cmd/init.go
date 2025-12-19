@@ -13,12 +13,18 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create a new smart frontend asset config file",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Initialize a new frontend asset configuration file in the current directory.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+This command creates a new smartfrontend.yaml file (or the name specified with -f)
+with the basic structure needed to manage your frontend dependencies.
+
+The configuration file defines which libraries to download from CDNs, their versions,
+and where to store them locally. Once initialized, you can add libraries with the
+'add' command and download them with the 'sync' command.
+
+Example:
+  smfaman init
+  smfaman init -f myproject.yaml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("init called")
 	},
