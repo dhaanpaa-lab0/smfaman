@@ -1,0 +1,8 @@
+destination: ./frontend/{library_name}
+project_name: testp
+cdn: cdnjs
+libraries:
+    bootstrap:
+        version: 5.3.8
+    bootswatch:
+        version: 5.3.8
