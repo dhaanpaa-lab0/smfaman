@@ -21,8 +21,9 @@ var (
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add <package-name>[@version]",
-	Short: "Add new library to the Smart Frontend Asset Manager Configuration",
+	Use:     "add <package-name>[@version]",
+	Aliases: []string{"pkgadd", "a"},
+	Short:   "Add new library to the Smart Frontend Asset Manager Configuration",
 	Long: `Add a new library to your frontend configuration file.
 
 You can specify the version directly using package@version syntax, or use

@@ -6,3 +6,5 @@ libraries:
         version: 5.3.8
     bootswatch:
         version: 5.3.8
+    jquery:
+        version: 3.7.1

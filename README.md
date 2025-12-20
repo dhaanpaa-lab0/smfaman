@@ -140,6 +140,112 @@ smfaman pkgver jquery --no-cache
 - Shows which version is latest
 - Press Enter to select (displays helpful command)
 
+### `delete`
+Remove a library from the configuration file.
+
+```bash
+# Remove a library from config
+smfaman delete react
+smfaman del bootstrap
+smfaman pkgdel jquery
+smfaman d lodash
+```
+
+**Note:** This command only removes the library from the configuration file. It does NOT delete downloaded files from your filesystem.
+
+### `upgrade`
+Upgrade library versions to newer releases.
+
+```bash
+# Upgrade a specific library to latest version
+smfaman upgrade react
+
+# Upgrade to a specific version
+smfaman upgrade react@18.3.0
+
+# Upgrade all libraries to latest versions
+smfaman upgrade
+
+# Interactive version selection
+smfaman upgrade bootstrap --interactive
+smfaman u jquery -i
+
+# Preview changes without modifying config
+smfaman upgrade --dry-run
+```
+
+**Features:**
+- Checks CDN for latest available versions
+- Can upgrade individual libraries or all at once
+- Interactive mode for version selection
+- Dry-run mode to preview changes
+
+### `clean`
+Remove destination folders for all libraries in the configuration.
+
+```bash
+# Remove all library folders (with confirmation)
+smfaman clean
+
+# Preview what would be deleted
+smfaman clean --dry-run
+
+# Remove without confirmation prompt
+smfaman clean --force
+
+# Clean with custom config file
+smfaman clean -f myproject.yaml
+```
+
+**Safety Features:**
+- Prompts for confirmation before deleting
+- Only deletes directories that exist
+- Shows what will be deleted before proceeding
+
+### `install`
+Install smfaman binary to user's bin directory and update PATH.
+
+```bash
+# Install to ~/bin
+smfaman install
+
+# Overwrite if already installed
+smfaman install --force
+```
+
+**Features:**
+- Creates `~/bin` directory if needed
+- Copies binary to `~/bin`
+- Automatically updates PATH in shell config
+- Persistent across terminal sessions
+- Supports bash, zsh, fish, PowerShell
+
+### `pkgmgr`
+Interactive TUI package manager for editing frontend configuration.
+
+```bash
+# Launch interactive package manager
+smfaman pkgmgr
+```
+
+**Features:**
+- View all libraries in configuration
+- Add new libraries interactively
+- Edit library settings (version, CDN, files, output path)
+- Delete libraries from configuration
+- Edit global settings (project name, destination, default CDN)
+- Save changes back to config file
+
+**Navigation:**
+- Arrow keys / Tab: Navigate between items
+- Enter: Edit selected library
+- `a`: Add new library
+- `v` or `i`: Select version interactively
+- `d`: Delete selected library
+- `g`: Edit global settings
+- `s`: Save and quit
+- `q` / Esc: Quit without saving
+
 ### `sync`
 Download libraries defined in the configuration file.
 
@@ -391,10 +497,20 @@ go test ./pkgs/frontend_mgr -bench=.
 smfaman/
 ├── cmd/                    # CLI commands (Cobra)
 │   ├── root.go            # Root command and config
-│   ├── init.go            # Initialize config file (interactive TUI)
+│   ├── init.go            # Initialize config file
 │   ├── init_tui.go        # Bubble Tea UI for init
 │   ├── add.go             # Add library command
 │   ├── add_test.go        # Add command tests
+│   ├── delete.go          # Delete library command
+│   ├── delete_test.go     # Delete command tests
+│   ├── upgrade.go         # Upgrade library command
+│   ├── upgrade_test.go    # Upgrade command tests
+│   ├── clean.go           # Clean library folders
+│   ├── clean_test.go      # Clean command tests
+│   ├── install.go         # Install binary to ~/bin
+│   ├── install_test.go    # Install command tests
+│   ├── pkgmgr.go          # Interactive package manager
+│   ├── pkgmgr_tui.go      # TUI for package manager
 │   ├── sync.go            # Sync libraries command
 │   ├── sync_test.go       # Sync command tests
 │   ├── pkgver.go          # List package versions
@@ -414,12 +530,17 @@ smfaman/
 │   └── cache/             # Cache management
 │       ├── cache.go       # Cache implementation
 │       └── cache_test.go  # Cache tests
+├── frontend/              # Vendored frontend assets
+│   ├── bootstrap/         # Bootstrap library files
+│   ├── bootswatch/        # Bootswatch theme files
+│   └── jquery/            # jQuery library files
 ├── examples/
 │   └── frontend.yaml      # Example configuration
 ├── main.go                # Entry point
 ├── go.mod                 # Go modules
 ├── README.md              # This file
-└── CLAUDE.md              # Development guide for Claude Code
+├── CLAUDE.md              # Development guide for Claude Code
+└── AGENTS.md              # Repository guidelines
 ```
 
 ## Requirements
@@ -459,7 +580,10 @@ Contributions are welcome from both humans and AI agents (Especially Claude Code
 - [x] Interactive mode for browsing available files
 - [x] Local cache for CDN metadata
 - [x] Progress bars for downloads
-- [ ] Add update command to check for library updates
+- [x] Add upgrade command to check for library updates
+- [x] Interactive package manager TUI
+- [x] Install command for binary installation
+- [x] Delete/clean commands for library management
 - [ ] Support for GitHub releases as a source
 - [ ] Parallel downloads for faster syncing
 - [ ] Generate HTML import tags with SRI hashes
