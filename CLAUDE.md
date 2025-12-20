@@ -32,6 +32,10 @@ go test ./pkgs/frontend_mgr -v
 # Run specific command tests
 go test ./cmd -v -run "TestAdd"
 go test ./cmd -v -run "TestSync"
+go test ./cmd -v -run "TestDelete"
+go test ./cmd -v -run "TestUpgrade"
+go test ./cmd -v -run "TestClean"
+go test ./cmd -v -run "TestInstall"
 
 # Run benchmarks
 go test ./pkgs/frontend_mgr -bench=. -benchtime=3x
@@ -39,11 +43,22 @@ go test ./pkgs/frontend_mgr -bench=. -benchtime=3x
 # Run the CLI directly
 go run main.go [command]
 
-# Test specific commands
+# Test specific commands (non-interactive)
 go run main.go init
+go run main.go add bootstrap@5.3.0
+go run main.go delete react
+go run main.go upgrade --dry-run
+go run main.go clean --dry-run
+go run main.go sync --dry-run
+
+# Test interactive commands
 go run main.go add react --interactive
 go run main.go pkgver jquery -i
-go run main.go sync --dry-run
+go run main.go upgrade bootstrap -i
+go run main.go pkgmgr
+
+# Test installation
+go build -o /tmp/smfaman && /tmp/smfaman install --force
 ```
 
 ## Architecture
@@ -62,7 +77,7 @@ The project uses **Cobra** for CLI framework with commands in `cmd/`:
 - `sync.go` + `sync_test.go` - Downloads libraries with progress bars
 - `pkgver.go` + `pkgver_tui.go` - List/browse package versions (interactive TUI)
 - `get.go` + `get_test.go` - Download remote config files
-- `cache.go` - Cache management (stats, clear, clean)
+- `cache.go` - Cache management (stats, clear, clear-packages, clean)
 
 Configuration is managed via **Viper**:
 - Default config: `$HOME/.smfaman.yaml`
@@ -88,7 +103,10 @@ Configuration is managed via **Viper**:
 **`pkgs/cache/`** - Local caching system
 - `cache.go` - Cache manager with TTL support (default: 24 hours)
 - Location: `~/.smfaman-cache/`
-- SHA256-based cache keys
+  - `metadata/` - CDN API responses (SHA256-based keys, 24h TTL)
+  - `packages/` - Downloaded library files (organized by CDN/library/version, no expiration)
+- Metadata cache uses SHA256 hashes as filenames
+- Package cache uses structured directories: `packages/{cdn}/{library}/{version}/{filepath}`
 
 **`frontend/`** - Vendored frontend assets
 - Contains downloaded libraries (Bootstrap, Bootswatch, jQuery)
@@ -134,12 +152,15 @@ Three CDN providers are supported with dedicated functions in `pkgs/frontend_mgr
 
 ### Caching System
 
+The project has two types of caching:
+
+**1. Metadata Cache (CDN API Responses)**
 All CDN API calls are automatically cached:
 - Cache manager created in `pkgs/cache/cache.go`
 - Default TTL: 24 hours
 - Cache keys generated with `GenerateKey(components ...string)`
 - Commands can disable cache with `--no-cache` flag
-- Cache location: `~/.smfaman-cache/`
+- Stored in: `~/.smfaman-cache/metadata/`
 
 To integrate caching in new CDN functions:
 ```go
@@ -151,6 +172,41 @@ if err == nil && found {
 }
 // ... fetch from CDN ...
 cacheManager.Set(cacheKey, result)
+```
+
+**2. Package File Cache (Downloaded Libraries)**
+Downloaded library files are cached globally:
+- Stored in: `~/.smfaman-cache/packages/{cdn}/{library}/{version}/{filepath}`
+- No expiration (kept indefinitely)
+- Can be disabled with `smfaman sync --no-package-cache`
+- Dramatically speeds up re-syncing and cross-project usage
+
+Package caching integration (in `cmd/sync.go`):
+```go
+// Check cache first
+fileData, cached, err := frontend_mgr.CacheManager.GetPackageFile(
+    string(task.CDN),
+    task.LibraryName,
+    task.Version,
+    task.FilePath,
+)
+
+if !cached {
+    // Download from CDN
+    fileData, err = downloadFileToMemory(task.URL)
+
+    // Store in cache
+    frontend_mgr.CacheManager.SetPackageFile(
+        string(task.CDN),
+        task.LibraryName,
+        task.Version,
+        task.FilePath,
+        fileData,
+    )
+}
+
+// Write to destination
+os.WriteFile(task.DestPath, fileData, 0644)
 ```
 
 ### Interactive TUI Components
@@ -547,6 +603,8 @@ smfaman --version
 Use dry-run or non-interactive modes:
 ```bash
 smfaman sync --dry-run
+smfaman upgrade --dry-run
+smfaman clean --dry-run
 smfaman add react@18.2.0  # Non-interactive
 ```
 
@@ -555,6 +613,7 @@ smfaman add react@18.2.0  # Non-interactive
 Clear cache during development:
 ```bash
 smfaman cache clear
+smfaman cache stats
 ```
 
 ### Testing Network Calls
@@ -563,6 +622,53 @@ Tests that make network calls should:
 - Use `testing.Short()` to skip in short mode
 - Handle network errors gracefully with `t.Skipf()`
 - Use `t.Logf()` for informational output
+
+### Common Development Patterns
+
+**Testing config loading:**
+```bash
+# Create test config
+cat > test.yaml <<EOF
+destination: "./test-output/{library_name}"
+libraries:
+  react:
+    version: "18.2.0"
+EOF
+
+# Test commands with it
+smfaman -f test.yaml sync --dry-run
+```
+
+**Testing PATH changes (install command):**
+```bash
+# Build to temp location
+go build -o /tmp/smfaman-test
+
+# Test install without affecting your actual installation
+/tmp/smfaman-test install --force
+
+# Verify
+ls -la ~/bin/smfaman
+grep "bin" ~/.zshrc  # or ~/.bashrc
+```
+
+**Testing upgrade logic:**
+```bash
+# Start with old version
+smfaman add react@17.0.0
+
+# Check what would upgrade
+smfaman upgrade --dry-run
+
+# Upgrade interactively
+smfaman upgrade react -i
+```
+
+**Debugging TUI issues:**
+- Add debug logging to model's Update function
+- Use `fmt.Fprintf(os.Stderr, "Debug: %+v\n", msg)` for debugging
+- Test in non-interactive mode first
+- Check terminal size with `COLUMNS` and `LINES` env vars
 
 ## Project Status
 
@@ -578,8 +684,9 @@ Tests that make network calls should:
 - ✅ Package version listing
 - ✅ Download remote configs
 - ✅ Sync with progress bars
-- ✅ Local caching (24h TTL)
-- ✅ Cache management commands
+- ✅ Local metadata caching (24h TTL)
+- ✅ Package file caching (permanent)
+- ✅ Cache management commands (stats, clear, clear-packages, clean)
 - ✅ Support for all three CDNs
 - ✅ Semantic version sorting
 - ✅ Scoped package support

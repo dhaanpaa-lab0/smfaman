@@ -6,15 +6,19 @@ A CLI tool for managing frontend assets from CDNs when you don't need bundling o
 
 ## Features
 
-- 🚀 Fetch frontend libraries from multiple CDNs
-- 🔒 Automatic SRI (Subresource Integrity) hash verification
-- 📦 Support for three major CDNs: jsDelivr, UNPKG, and CDNJS
-- 🔍 Browse available files and versions interactively
-- ⚡ Fast and lightweight - no Node.js required
-- 📝 Simple YAML configuration
-- 💾 Local cache for CDN metadata (24-hour TTL)
-- 🎨 Beautiful interactive TUI with progress bars
-- 🔄 Smart sync - only downloads missing files
+- 🚀 **Multi-CDN Support**: Fetch from jsDelivr, UNPKG, and CDNJS
+- 🔒 **SRI Hash Verification**: Automatic Subresource Integrity hashes
+- 📦 **Package Management**: Add, delete, upgrade libraries with version validation
+- 🔍 **Interactive TUI**: Browse versions, manage packages with keyboard navigation
+- ⚡ **Lightweight**: No Node.js required - pure Go binary
+- 📝 **YAML Configuration**: Simple, version-controllable config files
+- 💾 **Smart Caching**: Local CDN metadata cache with 24-hour TTL
+- 📦 **Package File Caching**: Downloaded files cached globally for faster re-syncing
+- 🎨 **Progress Tracking**: Real-time download progress bars
+- 🔄 **Incremental Sync**: Only downloads missing or changed files
+- 🔧 **CLI & TUI Modes**: Work your way - command line or interactive interface
+- 📥 **Auto-Installation**: Self-installing binary with PATH management
+- 🧹 **Clean Management**: Remove outdated libraries and clean caches
 
 ## Supported CDNs
 
@@ -28,7 +32,31 @@ A CLI tool for managing frontend assets from CDNs when you don't need bundling o
 
 ## Installation
 
-### From Source
+### Quick Install (Recommended)
+
+Build and self-install with automatic PATH management:
+
+```bash
+git clone https://github.com/yourusername/smfaman
+cd smfaman
+go build -o smfaman
+./smfaman install          # Installs to ~/bin and updates PATH
+```
+
+The `install` command will:
+- Create `~/bin` directory if needed
+- Copy the binary to `~/bin/smfaman`
+- Add `~/bin` to your PATH (persists across sessions)
+- Auto-detect your shell (bash, zsh, fish, PowerShell)
+
+### Using Go Install
+
+```bash
+go install nexus-sds.com/smfaman@latest
+# Then optionally run: smfaman install
+```
+
+### Manual Installation
 
 ```bash
 git clone https://github.com/yourusername/smfaman
@@ -37,35 +65,56 @@ go build -o smfaman
 sudo mv smfaman /usr/local/bin/
 ```
 
-### Using Go Install
-
-```bash
-go install nexus-sds.com/smfaman@latest
-```
-
 ## Quick Start
 
 ```bash
-# Initialize a new frontend config (interactive)
+# 1. Initialize a new frontend config (interactive)
 smfaman init
 
-# Add a library to your configuration
+# 2. Add libraries to your configuration
 smfaman add bootstrap@5.3.0
+smfaman add react --interactive      # Browse versions interactively
+smfaman add jquery                    # Uses latest version
 
-# Or use interactive version selector
-smfaman add react --interactive
-
-# List available versions for a package
-smfaman pkgver jquery
-
-# Sync all configured libraries to local directory
+# 3. Sync all configured libraries to local directory
 smfaman sync
 
-# Use custom config file
+# 4. Manage your libraries
+smfaman upgrade --dry-run             # Check for updates
+smfaman upgrade                       # Upgrade all libraries
+smfaman pkgmgr                        # Interactive package manager
+
+# 5. Clean up when needed
+smfaman delete old-library            # Remove from config
+smfaman clean                         # Delete downloaded files
+
+# 6. Install globally (optional)
+smfaman install                       # Installs to ~/bin
+
+# Work with custom config files
 smfaman -f myproject.yaml sync
 ```
 
 ## Commands
+
+### Command Summary
+
+| Command | Description | Aliases |
+|---------|-------------|---------|
+| `init` | Create new configuration file | - |
+| `add` | Add library to configuration | - |
+| `delete` | Remove library from configuration | `del`, `pkgdel`, `d` |
+| `upgrade` | Upgrade library versions | `u` |
+| `clean` | Remove library destination folders | `rm`, `remove` |
+| `install` | Install binary to ~/bin | - |
+| `pkgmgr` | Interactive package manager | - |
+| `sync` | Download libraries to filesystem | - |
+| `pkgver` | List package versions | - |
+| `get` | Download remote config file | - |
+| `cache stats` | Show cache statistics | - |
+| `cache clear` | Clear all cache | - |
+| `cache clear-packages` | Clear package cache only | - |
+| `cache clean` | Remove expired metadata | - |
 
 ### `init`
 Create a new smart frontend asset configuration file interactively.
@@ -259,6 +308,9 @@ smfaman sync --force
 # Preview what would be downloaded
 smfaman sync --dry-run
 
+# Disable package file caching (download directly)
+smfaman sync --no-package-cache
+
 # Use custom config
 smfaman -f myproject.yaml sync
 ```
@@ -266,9 +318,16 @@ smfaman -f myproject.yaml sync
 **Features:**
 - Smart incremental sync (only downloads missing files)
 - Real-time progress bars for each download
+- Package file caching (reuses downloaded files across projects)
 - Respects library-specific file filters
 - Creates destination directories automatically
 - Uses cached CDN metadata for speed
+
+**Package Caching:**
+Downloaded library files are cached in `~/.smfaman-cache/packages/` and reused across syncs and projects. This dramatically speeds up syncing when:
+- Re-syncing after deleting local files
+- Using the same libraries across multiple projects
+- Switching between library versions
 
 **Progress Display:**
 ```
@@ -304,24 +363,36 @@ smfaman get https://slow-server.com/config.yaml --timeout 60
 - Suggests next steps (review, sync)
 
 ### `cache`
-Manage local cache for CDN metadata.
+Manage local cache for CDN metadata and package files.
 
 ```bash
-# Show cache statistics
+# Show cache statistics (metadata and packages)
 smfaman cache stats
 
-# Clear all cached data
+# Clear all cached data (metadata and packages)
 smfaman cache clear
 
-# Remove only expired entries
+# Clear only package files (keep metadata)
+smfaman cache clear-packages
+
+# Remove only expired metadata entries
 smfaman cache clean
 ```
 
 **Cache Details:**
 - Location: `~/.smfaman-cache/`
-- Default TTL: 24 hours
-- Automatic cleanup on expiration
-- Speeds up repeated operations
+- Two cache types:
+  - **Metadata cache**: CDN API responses (24-hour TTL)
+  - **Package cache**: Downloaded library files (no expiration)
+- Automatic cleanup of expired metadata
+- Speeds up repeated operations and cross-project syncing
+
+**Package Cache Benefits:**
+The package cache stores downloaded library files permanently, so:
+- Switching between projects using the same libraries is instant
+- Re-syncing after cleaning local files doesn't re-download
+- Testing different versions is faster (cached versions reused)
+- Saves bandwidth and CDN API calls
 
 ## Configuration
 
@@ -374,6 +445,25 @@ default_cdn: jsdelivr
 cache_duration: 24h
 verify_ssl: true
 ```
+
+## Key Advantages
+
+### Why use smfaman instead of npm?
+
+**Perfect for:**
+- Static sites with minimal JavaScript needs
+- HTML/CSS projects that just need a few libraries
+- Teaching environments where simplicity matters
+- Projects where bundling overhead isn't justified
+- Rapid prototyping without build toolchain setup
+
+**Benefits:**
+- ⚡ **No build step**: Download and use immediately
+- 🪶 **No node_modules**: Keep your project lightweight (GBs → KBs)
+- 🔒 **Version locked**: YAML config is your lockfile
+- 🌐 **CDN-ready**: Downloaded files can be served directly or re-hosted
+- 📦 **Clean separation**: Frontend assets separate from backend code
+- 🔄 **Easy sharing**: One YAML file defines all dependencies
 
 ## Usage Examples
 
@@ -530,10 +620,10 @@ smfaman/
 │   └── cache/             # Cache management
 │       ├── cache.go       # Cache implementation
 │       └── cache_test.go  # Cache tests
-├── frontend/              # Vendored frontend assets
-│   ├── bootstrap/         # Bootstrap library files
-│   ├── bootswatch/        # Bootswatch theme files
-│   └── jquery/            # jQuery library files
+├── frontend/              # Vendored frontend assets (used for testing and is ephemeral)
+│   ├── bootstrap/         # Bootstrap library files (used for testing and is ephemeral)
+│   ├── bootswatch/        # Bootswatch theme files (used for testing and is ephemeral)
+│   └── jquery/            # jQuery library files (used for testing and is ephemeral)
 ├── examples/
 │   └── frontend.yaml      # Example configuration
 ├── main.go                # Entry point
@@ -605,6 +695,64 @@ Contributions are welcome from both humans and AI agents (Especially Claude Code
 - To be awesome
 - To spark joy
 
+
+## Troubleshooting
+
+### Common Issues
+
+**Library not found:**
+```bash
+# Check if package exists on CDN
+smfaman pkgver library-name
+
+# Try different CDN
+smfaman add library-name --cdn jsdelivr
+smfaman add library-name --cdn cdnjs
+```
+
+**Cache issues:**
+```bash
+# Clear cache and retry
+smfaman cache clear
+smfaman add library-name
+```
+
+**Install command not updating PATH:**
+```bash
+# Manually reload shell configuration
+source ~/.bashrc    # or ~/.zshrc, ~/.bash_profile
+# Or restart your terminal
+```
+
+**Permission denied during install:**
+```bash
+# Install creates ~/bin which doesn't need sudo
+# If you get permission errors, check directory permissions
+ls -la ~/bin
+```
+
+## FAQ
+
+**Q: Does this replace npm/yarn?**
+A: No, smfaman is for simple projects that only need CDN libraries without bundling. Use npm for projects with complex build pipelines.
+
+**Q: Can I use private/scoped packages?**
+A: Yes, scoped packages work: `smfaman add @babel/core@7.22.0`
+
+**Q: Where are files downloaded?**
+A: To the destination specified in your config file (default: `./frontend/{library_name}`)
+
+**Q: Can I download specific files only?**
+A: Yes, use the `--files` flag or specify `files:` in your config YAML.
+
+**Q: How do I update all libraries?**
+A: Run `smfaman upgrade` to upgrade all libraries to their latest versions.
+
+**Q: Is the cache safe to delete?**
+A: Yes, run `smfaman cache clear`. It only contains CDN metadata and will be rebuilt as needed.
+
+**Q: Can I use this in CI/CD?**
+A: Absolutely! The config file is version-controllable, and `smfaman sync` downloads all dependencies.
 
 ## Support
 

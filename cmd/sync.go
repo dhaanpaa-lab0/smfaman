@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	syncForce  bool
-	syncDryRun bool
+	syncForce          bool
+	syncDryRun         bool
+	syncNoPackageCache bool
 )
 
 // syncCmd represents the sync command
@@ -56,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().BoolVar(&syncForce, "force", false, "Re-download all files even if they exist")
 	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "Show what would be downloaded without downloading")
+	syncCmd.Flags().BoolVar(&syncNoPackageCache, "no-package-cache", false, "Disable package caching and download directly")
 }
 
 // DownloadTask represents a file to download
@@ -260,6 +262,94 @@ func filterFiles(files []CDNFile, patterns []string) []CDNFile {
 
 // downloadFile downloads a file from URL to destination
 func downloadFile(url, destPath string) error {
+	// This is a wrapper that will be replaced by downloadFileWithTask
+	// which has access to task metadata for caching
+	return downloadFileDirectly(url, destPath)
+}
+
+// downloadFileWithTask downloads a file with package caching support
+func downloadFileWithTask(task DownloadTask) error {
+	// Set package cache enabled/disabled based on flag
+	if syncNoPackageCache {
+		frontend_mgr.CacheManager.SetPackageCacheEnabled(false)
+	}
+
+	var fileData []byte
+	var err error
+	cached := false
+
+	// Try to get from package cache first
+	if !syncNoPackageCache && !syncForce {
+		fileData, cached, err = frontend_mgr.CacheManager.GetPackageFile(
+			string(task.CDN),
+			task.LibraryName,
+			task.Version,
+			task.FilePath,
+		)
+		if err != nil {
+			// Log warning but continue with download
+			fmt.Fprintf(os.Stderr, "Warning: cache read failed: %v\n", err)
+		}
+	}
+
+	// If not cached, download from CDN
+	if !cached {
+		fileData, err = downloadFileToMemory(task.URL)
+		if err != nil {
+			return err
+		}
+
+		// Save to package cache
+		if !syncNoPackageCache {
+			if err := frontend_mgr.CacheManager.SetPackageFile(
+				string(task.CDN),
+				task.LibraryName,
+				task.Version,
+				task.FilePath,
+				fileData,
+			); err != nil {
+				// Log warning but continue
+				fmt.Fprintf(os.Stderr, "Warning: failed to cache file: %v\n", err)
+			}
+		}
+	}
+
+	// Create destination directory
+	dir := filepath.Dir(task.DestPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Write to destination
+	if err := os.WriteFile(task.DestPath, fileData, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// downloadFileToMemory downloads a file to memory
+func downloadFileToMemory(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return data, nil
+}
+
+// downloadFileDirectly downloads a file directly without caching
+func downloadFileDirectly(url, destPath string) error {
 	// Create destination directory
 	dir := filepath.Dir(destPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -448,7 +538,8 @@ func (m syncModel) downloadNext() tea.Cmd {
 		task := m.tasks[m.currentIndex]
 
 		// Download the file (this happens in background)
-		err := downloadFile(task.URL, task.DestPath)
+		// Use downloadFileWithTask for package caching support
+		err := downloadFileWithTask(task)
 		if err != nil {
 			return downloadErrorMsg{err: fmt.Errorf("failed to download %s: %w", task.FilePath, err)}
 		}

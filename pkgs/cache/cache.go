@@ -15,6 +15,12 @@ const (
 
 	// CacheDirName is the name of the cache directory
 	CacheDirName = ".smfaman-cache"
+
+	// MetadataDirName is the subdirectory for metadata cache
+	MetadataDirName = "metadata"
+
+	// PackagesDirName is the subdirectory for package file cache
+	PackagesDirName = "packages"
 )
 
 // Entry represents a cached CDN response
@@ -27,9 +33,12 @@ type Entry struct {
 
 // Manager handles cache operations
 type Manager struct {
-	cacheDir string
-	ttl      time.Duration
-	enabled  bool
+	cacheDir     string
+	metadataDir  string
+	packagesDir  string
+	ttl          time.Duration
+	enabled      bool
+	packageCache bool
 }
 
 // NewManager creates a new cache manager
@@ -44,19 +53,30 @@ func NewManager(enabled bool, ttl time.Duration) (*Manager, error) {
 	}
 
 	m := &Manager{
-		cacheDir: cacheDir,
-		ttl:      ttl,
-		enabled:  enabled,
+		cacheDir:     cacheDir,
+		metadataDir:  filepath.Join(cacheDir, MetadataDirName),
+		packagesDir:  filepath.Join(cacheDir, PackagesDirName),
+		ttl:          ttl,
+		enabled:      enabled,
+		packageCache: true, // Enable package caching by default
 	}
 
 	if enabled {
-		// Ensure cache directory exists
-		if err := os.MkdirAll(cacheDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		// Ensure cache directories exist
+		if err := os.MkdirAll(m.metadataDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create metadata cache directory: %w", err)
+		}
+		if err := os.MkdirAll(m.packagesDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create packages cache directory: %w", err)
 		}
 	}
 
 	return m, nil
+}
+
+// SetPackageCacheEnabled enables or disables package caching
+func (m *Manager) SetPackageCacheEnabled(enabled bool) {
+	m.packageCache = enabled
 }
 
 // Get retrieves a cached entry if it exists and is not expired
@@ -134,7 +154,7 @@ func (m *Manager) Set(key string, data interface{}) error {
 	return nil
 }
 
-// Clear removes all cached entries
+// Clear removes all cached entries (both metadata and packages)
 func (m *Manager) Clear() error {
 	if !m.enabled {
 		return nil
@@ -145,23 +165,46 @@ func (m *Manager) Clear() error {
 		return fmt.Errorf("failed to clear cache: %w", err)
 	}
 
-	// Recreate cache directory
-	if err := os.MkdirAll(m.cacheDir, 0755); err != nil {
-		return fmt.Errorf("failed to recreate cache directory: %w", err)
+	// Recreate cache directories
+	if err := os.MkdirAll(m.metadataDir, 0755); err != nil {
+		return fmt.Errorf("failed to recreate metadata cache directory: %w", err)
+	}
+	if err := os.MkdirAll(m.packagesDir, 0755); err != nil {
+		return fmt.Errorf("failed to recreate packages cache directory: %w", err)
 	}
 
 	return nil
 }
 
-// ClearExpired removes all expired cache entries
+// ClearPackages removes all cached package files
+func (m *Manager) ClearPackages() error {
+	if !m.enabled {
+		return nil
+	}
+
+	// Remove packages directory
+	if err := os.RemoveAll(m.packagesDir); err != nil {
+		return fmt.Errorf("failed to clear package cache: %w", err)
+	}
+
+	// Recreate packages directory
+	if err := os.MkdirAll(m.packagesDir, 0755); err != nil {
+		return fmt.Errorf("failed to recreate package cache directory: %w", err)
+	}
+
+	return nil
+}
+
+// ClearExpired removes all expired metadata cache entries
+// Package cache files are not expired (they're kept indefinitely)
 func (m *Manager) ClearExpired() (int, error) {
 	if !m.enabled {
 		return 0, nil
 	}
 
-	entries, err := os.ReadDir(m.cacheDir)
+	entries, err := os.ReadDir(m.metadataDir)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read cache directory: %w", err)
+		return 0, fmt.Errorf("failed to read metadata cache directory: %w", err)
 	}
 
 	removed := 0
@@ -170,7 +213,7 @@ func (m *Manager) ClearExpired() (int, error) {
 			continue
 		}
 
-		filePath := filepath.Join(m.cacheDir, entry.Name())
+		filePath := filepath.Join(m.metadataDir, entry.Name())
 
 		// Read and parse entry
 		data, err := os.ReadFile(filePath)
@@ -197,18 +240,20 @@ func (m *Manager) ClearExpired() (int, error) {
 // Stats returns cache statistics
 func (m *Manager) Stats() (CacheStats, error) {
 	stats := CacheStats{
-		Enabled:  m.enabled,
-		CacheDir: m.cacheDir,
-		TTL:      m.ttl,
+		Enabled:       m.enabled,
+		CacheDir:      m.cacheDir,
+		TTL:           m.ttl,
+		PackageCache:  m.packageCache,
 	}
 
 	if !m.enabled {
 		return stats, nil
 	}
 
-	entries, err := os.ReadDir(m.cacheDir)
+	// Count metadata cache entries
+	entries, err := os.ReadDir(m.metadataDir)
 	if err != nil {
-		return stats, fmt.Errorf("failed to read cache directory: %w", err)
+		return stats, fmt.Errorf("failed to read metadata cache directory: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -216,14 +261,14 @@ func (m *Manager) Stats() (CacheStats, error) {
 			continue
 		}
 
-		filePath := filepath.Join(m.cacheDir, entry.Name())
+		filePath := filepath.Join(m.metadataDir, entry.Name())
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
 
-		stats.TotalEntries++
-		stats.TotalSize += info.Size()
+		stats.MetadataEntries++
+		stats.MetadataSize += info.Size()
 
 		// Read and parse entry to check expiration
 		data, err := os.ReadFile(filePath)
@@ -241,25 +286,105 @@ func (m *Manager) Stats() (CacheStats, error) {
 		}
 	}
 
+	// Count package cache entries
+	if m.packageCache {
+		stats.PackageFiles, stats.PackageSize = countPackageFiles(m.packagesDir)
+	}
+
+	stats.TotalSize = stats.MetadataSize + stats.PackageSize
+
 	return stats, nil
+}
+
+// countPackageFiles recursively counts files and total size in package cache
+func countPackageFiles(dir string) (int, int64) {
+	var count int
+	var size int64
+
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		count++
+		size += info.Size()
+		return nil
+	})
+
+	return count, size
 }
 
 // CacheStats represents cache statistics
 type CacheStats struct {
-	Enabled        bool
-	CacheDir       string
-	TTL            time.Duration
-	TotalEntries   int
-	ExpiredEntries int
-	TotalSize      int64
+	Enabled         bool
+	CacheDir        string
+	TTL             time.Duration
+	PackageCache    bool
+	MetadataEntries int
+	ExpiredEntries  int
+	MetadataSize    int64
+	PackageFiles    int
+	PackageSize     int64
+	TotalSize       int64
 }
 
-// getFilePath returns the file path for a cache key
+// getFilePath returns the file path for a metadata cache key
 func (m *Manager) getFilePath(key string) string {
 	// Use SHA256 hash of key as filename to avoid filesystem issues
 	hash := sha256.Sum256([]byte(key))
 	filename := fmt.Sprintf("%x.json", hash)
-	return filepath.Join(m.cacheDir, filename)
+	return filepath.Join(m.metadataDir, filename)
+}
+
+// getPackageFilePath returns the file path for a package cache entry
+// Key format: "{cdn}/{library}/{version}/{filepath}"
+func (m *Manager) getPackageFilePath(cdn, library, version, filePath string) string {
+	// Create directory structure: packages/{cdn}/{library}/{version}/{filepath}
+	return filepath.Join(m.packagesDir, cdn, library, version, filePath)
+}
+
+// GetPackageFile retrieves a cached package file
+// Returns the file data, whether it was found, and any error
+func (m *Manager) GetPackageFile(cdn, library, version, filePath string) ([]byte, bool, error) {
+	if !m.enabled || !m.packageCache {
+		return nil, false, nil
+	}
+
+	cachePath := m.getPackageFilePath(cdn, library, version, filePath)
+
+	// Check if file exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil, false, nil
+	}
+
+	// Read file
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to read cached package file: %w", err)
+	}
+
+	return data, true, nil
+}
+
+// SetPackageFile stores a package file in the cache
+func (m *Manager) SetPackageFile(cdn, library, version, filePath string, data []byte) error {
+	if !m.enabled || !m.packageCache {
+		return nil
+	}
+
+	cachePath := m.getPackageFilePath(cdn, library, version, filePath)
+
+	// Create directory structure
+	dir := filepath.Dir(cachePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create cache directory: %w", err)
+	}
+
+	// Write file
+	if err := os.WriteFile(cachePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write package file to cache: %w", err)
+	}
+
+	return nil
 }
 
 // getCacheDir returns the cache directory path

@@ -59,8 +59,11 @@ When testing interactive commands:
 
 ## Security & Configuration Tips
 - Local config: `~/.smfaman.yaml`; project config: `smartfrontend.yaml`.
-- Cache location: `~/.smfaman-cache/` (24h TTL by default).
+- Cache location: `~/.smfaman-cache/`
+  - `metadata/` - CDN API responses (24h TTL)
+  - `packages/` - Downloaded library files (permanent, shared across projects)
 - Avoid committing local configs or cache artifacts; prefer the `examples/` directory for shared templates.
+- Package cache is safe to share across projects and significantly speeds up syncing
 
 ## Interactive Features
 The project includes several interactive TUI (Terminal User Interface) components:
@@ -77,3 +80,38 @@ All interactive features are built with Bubble Tea and support:
 - Tab/Shift+Tab for field navigation
 - Search/filter capabilities
 - Keyboard shortcuts for common actions
+
+## Common Development Pitfalls & Best Practices
+
+### Configuration Management
+- **Always initialize `config.Libraries` map**: Check for nil before accessing
+- **Use helper methods**: Prefer `config.GetLibraryDestination()` over manual path building
+- **Validate before saving**: Ensure required fields exist before writing YAML
+
+### Command Implementation
+- **Reuse config loaders**: Use shared `loadConfig()` functions to maintain consistency
+- **Support dry-run**: Add `--dry-run` flag for destructive operations (upgrade, clean, delete)
+- **Provide user feedback**: Show what changed, what was skipped, and suggest next steps
+- **Handle aliases properly**: Register command aliases in the `Aliases` field
+
+### Error Handling
+- **Wrap errors with context**: Use `fmt.Errorf("action failed: %w", err)` for traceable errors
+- **Validate early**: Check file existence, version availability before performing operations
+- **User-friendly messages**: Avoid exposing internal errors; suggest solutions
+
+### Testing Strategy
+- **Test both interactive and non-interactive modes**: Ensure CLI args work without TUI
+- **Mock network calls sparingly**: Most tests use real CDN calls but handle failures gracefully
+- **Use `--dry-run` in tests**: Verify logic without side effects
+- **Test error paths**: Invalid versions, missing files, network failures
+
+### TUI Development
+- **Keep models simple**: Separate view logic from business logic
+- **Test without TUI first**: Implement core functionality in non-interactive mode
+- **Handle window resize**: TUI should adapt to terminal size changes
+- **Provide escape hatches**: Always allow `q`, `Esc`, or `Ctrl+C` to exit
+
+### Performance Considerations
+- **Leverage cache**: All CDN API calls should check cache first
+- **Avoid redundant fetches**: Batch operations where possible
+- **Show progress**: Use progress bars for long-running operations (sync, upgrade all)

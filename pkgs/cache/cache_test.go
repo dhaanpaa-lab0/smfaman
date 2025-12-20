@@ -150,8 +150,8 @@ func TestCacheClear(t *testing.T) {
 		t.Fatalf("failed to get stats: %v", err)
 	}
 
-	if stats.TotalEntries != 5 {
-		t.Errorf("expected 5 entries, got %d", stats.TotalEntries)
+	if stats.MetadataEntries != 5 {
+		t.Errorf("expected 5 entries, got %d", stats.MetadataEntries)
 	}
 
 	// Clear cache
@@ -165,8 +165,8 @@ func TestCacheClear(t *testing.T) {
 		t.Fatalf("failed to get stats: %v", err)
 	}
 
-	if stats.TotalEntries != 0 {
-		t.Errorf("expected 0 entries after clear, got %d", stats.TotalEntries)
+	if stats.MetadataEntries != 0 {
+		t.Errorf("expected 0 entries after clear, got %d", stats.MetadataEntries)
 	}
 }
 
@@ -209,8 +209,8 @@ func TestClearExpired(t *testing.T) {
 		t.Fatalf("failed to get stats: %v", err)
 	}
 
-	if stats.TotalEntries != 1 {
-		t.Errorf("expected 1 entry remaining, got %d", stats.TotalEntries)
+	if stats.MetadataEntries != 1 {
+		t.Errorf("expected 1 entry remaining, got %d", stats.MetadataEntries)
 	}
 }
 
