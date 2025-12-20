@@ -19,6 +19,7 @@ A CLI tool for managing frontend assets from CDNs when you don't need bundling o
 - 🔧 **CLI & TUI Modes**: Work your way - command line or interactive interface
 - 📥 **Auto-Installation**: Self-installing binary with PATH management
 - 🧹 **Clean Management**: Remove outdated libraries and clean caches
+- 🚀 **Framework Bootstrapping**: Quick-start projects with XMLUI and HTMX
 
 ## Supported CDNs
 
@@ -91,6 +92,10 @@ smfaman clean                         # Delete downloaded files
 # 6. Install globally (optional)
 smfaman install                       # Installs to ~/bin
 
+# 7. Bootstrap a new framework project
+smfaman bootstrap xmlui               # Start with XMLUI
+smfaman bootstrap htmx                # Start with HTMX
+
 # Work with custom config files
 smfaman -f myproject.yaml sync
 ```
@@ -111,6 +116,7 @@ smfaman -f myproject.yaml sync
 | `sync` | Download libraries to filesystem | - |
 | `pkgver` | List package versions | - |
 | `get` | Download remote config file | - |
+| `bootstrap` | Bootstrap new projects from frameworks | - |
 | `cache stats` | Show cache statistics | - |
 | `cache clear` | Clear all cache | - |
 | `cache clear-packages` | Clear package cache only | - |
@@ -362,6 +368,47 @@ smfaman get https://slow-server.com/config.yaml --timeout 60
 - Shows config summary after download
 - Suggests next steps (review, sync)
 
+### `bootstrap`
+Bootstrap new projects from various frameworks by downloading and setting up starter kits.
+
+```bash
+# Bootstrap a new XMLUI project (current directory)
+smfaman bootstrap xmlui
+
+# Bootstrap XMLUI project in specific directory
+smfaman bootstrap xmlui --directory my-xmlui-app
+
+# Bootstrap a new HTMX project with Go backend
+smfaman bootstrap htmx
+
+# Bootstrap HTMX project in specific directory
+smfaman bootstrap htmx --directory my-htmx-app
+```
+
+**Supported Frameworks:**
+
+**XMLUI:**
+- Downloads the official XMLUI starter kit (xmlui-invoice)
+- Includes XMLUI Invoice app, XMLUI Engine, and test server
+- Ready-to-run example application
+
+**HTMX:**
+- Downloads HTMX starter template with Go backend
+- Includes HTMX library, sample templates, backend server, and static assets
+- Complete working starter application
+
+**Features:**
+- Downloads latest release from GitHub
+- Extracts ZIP archive safely (prevents ZipSlip attacks)
+- Cross-platform support (Linux, macOS, Windows)
+- Provides platform-specific startup instructions
+- Cleans up temporary files automatically
+
+**After Bootstrapping:**
+Navigate to the project directory and run the provided start script:
+- Mac/Linux/WSL: `./start.sh`
+- Windows: `start.bat`
+
 ### `cache`
 Manage local cache for CDN metadata and package files.
 
@@ -539,6 +586,25 @@ libraries:
       - "dist/css/"  # Prefix match - all files in dist/css/
 ```
 
+### Example 6: Bootstrap a New Framework Project
+
+```bash
+# Bootstrap a new XMLUI project
+smfaman bootstrap xmlui --directory my-xmlui-project
+cd my-xmlui-project
+
+# Start the development server (Mac/Linux/WSL)
+./start.sh
+
+# Or on Windows
+start.bat
+
+# Bootstrap an HTMX project with Go backend
+smfaman bootstrap htmx --directory my-htmx-app
+cd my-htmx-app
+./start.sh  # or start.bat on Windows
+```
+
 ## API Integration
 
 The tool integrates with three CDN APIs:
@@ -607,6 +673,9 @@ smfaman/
 │   ├── pkgver_tui.go      # Interactive version selector
 │   ├── get.go             # Download remote config
 │   ├── get_test.go        # Get command tests
+│   ├── bootstrap.go       # Bootstrap framework projects
+│   ├── bootstrap_xmlui.go # Bootstrap XMLUI projects
+│   ├── bootstrap_htmx.go  # Bootstrap HTMX projects
 │   └── cache.go           # Cache management commands
 ├── pkgs/
 │   ├── frontend_mgr/      # CDN API integration
