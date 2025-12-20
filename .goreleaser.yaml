@@ -1,0 +1,51 @@
+version: 2
+
+project_name: smfaman
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: smfaman
+    main: ./main.go
+    binary: smfaman
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X nexus-sds.com/smfaman/cmd.version={{.Version}}
+      - -X nexus-sds.com/smfaman/cmd.commit={{.Commit}}
+      - -X nexus-sds.com/smfaman/cmd.date={{.Date}}
+
+archives:
+  - id: smfaman
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - smartfrontend.yaml
+      - examples/*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ .Tag }}-snapshot"
+
+changelog:
+  disable: true
