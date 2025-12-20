@@ -49,3 +49,12 @@ snapshot:
 
 changelog:
   disable: true
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_USER }}"
+    name: "{{ .ProjectName }}"
+  name_template: "Release {{ .Tag }}"
+  draft: false
+  prerelease: auto
+  make_latest: true

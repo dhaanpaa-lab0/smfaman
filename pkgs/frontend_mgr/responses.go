@@ -102,3 +102,79 @@ type UnpkgPackageResponse struct {
 		Version string `json:"version"`
 	} `json:"versions"` // Map of version number to version info
 }
+
+// CdnjsSearchResponse represents the response from https://api.cdnjs.com/libraries?search={query}
+type CdnjsSearchResponse struct {
+	Results []CdnjsSearchResult `json:"results"`
+	Total   int                 `json:"total"`
+}
+
+// CdnjsSearchResult represents a single search result from CDNJS
+type CdnjsSearchResult struct {
+	Name        string `json:"name"`
+	Latest      string `json:"latest"`      // URL to latest version
+	Description string `json:"description"` // Package description
+	Version     string `json:"version"`     // Latest version number
+	Homepage    string `json:"homepage"`    // Project homepage URL
+	Keywords    []string `json:"keywords,omitempty"` // Package keywords
+}
+
+// NpmSearchResponse represents the response from npm registry search
+// Used for UNPKG and jsDelivr package searches
+type NpmSearchResponse struct {
+	Objects []NpmSearchObject `json:"objects"`
+	Total   int               `json:"total"`
+	Time    string            `json:"time"`
+}
+
+// NpmSearchObject represents a single search result from npm registry
+type NpmSearchObject struct {
+	Package NpmPackageInfo `json:"package"`
+	Score   NpmScore       `json:"score"`
+}
+
+// NpmPackageInfo contains package information from npm search
+type NpmPackageInfo struct {
+	Name        string            `json:"name"`
+	Scope       string            `json:"scope,omitempty"`
+	Version     string            `json:"version"`
+	Description string            `json:"description"`
+	Keywords    []string          `json:"keywords,omitempty"`
+	Date        string            `json:"date"`
+	Links       NpmPackageLinks   `json:"links"`
+	Publisher   NpmPublisher      `json:"publisher"`
+}
+
+// NpmPackageLinks contains URLs for npm package
+type NpmPackageLinks struct {
+	Npm        string `json:"npm"`
+	Homepage   string `json:"homepage,omitempty"`
+	Repository string `json:"repository,omitempty"`
+	Bugs       string `json:"bugs,omitempty"`
+}
+
+// NpmPublisher contains publisher information
+type NpmPublisher struct {
+	Username string `json:"username"`
+	Email    string `json:"email,omitempty"`
+}
+
+// NpmScore contains scoring information for search results
+type NpmScore struct {
+	Final  float64 `json:"final"`
+	Detail struct {
+		Quality     float64 `json:"quality"`
+		Popularity  float64 `json:"popularity"`
+		Maintenance float64 `json:"maintenance"`
+	} `json:"detail"`
+}
+
+// SearchResult is a unified search result structure across all CDNs
+type SearchResult struct {
+	Name        string
+	Version     string
+	Description string
+	Homepage    string
+	Keywords    []string
+	CDN         string // Which CDN this result came from
+}

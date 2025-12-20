@@ -262,3 +262,140 @@ func SortVersions(versions []string) []string {
 
 	return result
 }
+
+// SearchCdnjs searches for packages on CDNJS
+// Endpoint: https://api.cdnjs.com/libraries?search={query}&limit={limit}
+func SearchCdnjs(query string, limit int) ([]SearchResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Check cache first
+	cacheKey := cache.GenerateKey("cdnjs", "search", query, fmt.Sprintf("%d", limit))
+	var cachedResults []SearchResult
+	if found, _ := CacheManager.Get(cacheKey, &cachedResults); found {
+		return cachedResults, nil
+	}
+
+	url := fmt.Sprintf("https://api.cdnjs.com/libraries?search=%s&limit=%d&fields=name,description,version,homepage,keywords", query, limit)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch from CDNJS: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("CDNJS API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var response CdnjsSearchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode CDNJS response: %w", err)
+	}
+
+	// Convert to unified SearchResult format
+	results := make([]SearchResult, len(response.Results))
+	for i, r := range response.Results {
+		results[i] = SearchResult{
+			Name:        r.Name,
+			Version:     r.Version,
+			Description: r.Description,
+			Homepage:    r.Homepage,
+			Keywords:    r.Keywords,
+			CDN:         "cdnjs",
+		}
+	}
+
+	// Store in cache
+	CacheManager.Set(cacheKey, results)
+
+	return results, nil
+}
+
+// SearchNpm searches for packages on npm registry
+// Used for UNPKG and jsDelivr searches since they use npm packages
+// Endpoint: https://registry.npmjs.org/-/v1/search?text={query}&size={limit}
+func SearchNpm(query string, limit int) ([]SearchResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Check cache first
+	cacheKey := cache.GenerateKey("npm", "search", query, fmt.Sprintf("%d", limit))
+	var cachedResults []SearchResult
+	if found, _ := CacheManager.Get(cacheKey, &cachedResults); found {
+		return cachedResults, nil
+	}
+
+	url := fmt.Sprintf("https://registry.npmjs.org/-/v1/search?text=%s&size=%d", query, limit)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch from npm registry: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("npm registry API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var response NpmSearchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode npm search response: %w", err)
+	}
+
+	// Convert to unified SearchResult format
+	results := make([]SearchResult, len(response.Objects))
+	for i, obj := range response.Objects {
+		results[i] = SearchResult{
+			Name:        obj.Package.Name,
+			Version:     obj.Package.Version,
+			Description: obj.Package.Description,
+			Homepage:    obj.Package.Links.Homepage,
+			Keywords:    obj.Package.Keywords,
+			CDN:         "npm",
+		}
+	}
+
+	// Store in cache
+	CacheManager.Set(cacheKey, results)
+
+	return results, nil
+}
+
+// SearchAllCDNs searches across all supported CDNs and returns unified results
+func SearchAllCDNs(query string, limit int) ([]SearchResult, error) {
+	var allResults []SearchResult
+
+	// Search CDNJS
+	cdnjsResults, err := SearchCdnjs(query, limit)
+	if err == nil {
+		allResults = append(allResults, cdnjsResults...)
+	}
+
+	// Search npm (for UNPKG and jsDelivr)
+	npmResults, err := SearchNpm(query, limit)
+	if err == nil {
+		// Mark these as available on both UNPKG and jsDelivr
+		for i := range npmResults {
+			npmResults[i].CDN = "unpkg, jsdelivr"
+		}
+		allResults = append(allResults, npmResults...)
+	}
+
+	// Deduplicate by package name (prefer CDNJS results)
+	seen := make(map[string]bool)
+	uniqueResults := make([]SearchResult, 0, len(allResults))
+
+	for _, result := range allResults {
+		if !seen[result.Name] {
+			seen[result.Name] = true
+			uniqueResults = append(uniqueResults, result)
+		}
+	}
+
+	return uniqueResults, nil
+}
