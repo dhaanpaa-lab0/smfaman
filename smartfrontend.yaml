@@ -1,5 +1,5 @@
-destination: ./frontend/{library_name}
-project_name: testp
+destination: ./frontend1/{library_name}
+project_name: testproject
 cdn: cdnjs
 libraries:
     bootstrap:
