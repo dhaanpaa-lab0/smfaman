@@ -107,8 +107,8 @@ func runSync() error {
 		return nil
 	}
 
-	// Run interactive download with progress
-	return runInteractiveDownload(tasks)
+	// Run interactive download with progress (fallback to simple mode if no TTY)
+	return runDownloadWithProgress(tasks)
 }
 
 // buildDownloadTasks creates a list of files to download
@@ -183,14 +183,13 @@ func fetchFileList(libName, version string, cdn frontend_config.CDN) ([]CDNFile,
 		if err != nil {
 			return nil, err
 		}
+		// UNPKG returns all files (no directories), Type field contains MIME type
 		for _, file := range meta.Files {
-			if file.Type == "file" {
-				files = append(files, CDNFile{
-					Path: strings.TrimPrefix(file.Path, "/"),
-					URL:  fmt.Sprintf("https://unpkg.com/%s@%s%s", libName, version, file.Path),
-					Size: int64(file.Size),
-				})
-			}
+			files = append(files, CDNFile{
+				Path: strings.TrimPrefix(file.Path, "/"),
+				URL:  fmt.Sprintf("https://unpkg.com/%s@%s%s", libName, version, file.Path),
+				Size: int64(file.Size),
+			})
 		}
 
 	case frontend_config.CDNCdnjs:
@@ -383,13 +382,18 @@ func downloadFileDirectly(url, destPath string) error {
 	return nil
 }
 
-// runInteractiveDownload runs the download with progress UI
-func runInteractiveDownload(tasks []DownloadTask) error {
+// runDownloadWithProgress runs the download with progress UI if TTY available, otherwise simple mode
+func runDownloadWithProgress(tasks []DownloadTask) error {
+	// Try interactive mode first
 	m := newSyncModel(tasks)
 	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {
+		// If TTY error, fall back to simple mode
+		if strings.Contains(err.Error(), "TTY") || strings.Contains(err.Error(), "tty") {
+			return runSimpleDownload(tasks)
+		}
 		return fmt.Errorf("error running interactive download: %w", err)
 	}
 
@@ -401,6 +405,25 @@ func runInteractiveDownload(tasks []DownloadTask) error {
 		fmt.Printf("\n✓ Sync complete!\n")
 		fmt.Printf("Downloaded %d files\n", len(tasks))
 	}
+
+	return nil
+}
+
+// runSimpleDownload runs the download with simple text progress (no TTY required)
+func runSimpleDownload(tasks []DownloadTask) error {
+	fmt.Println("Downloading files...")
+
+	for i, task := range tasks {
+		fmt.Printf("[%d/%d] %s@%s: %s\n", i+1, len(tasks), task.LibraryName, task.Version, task.FilePath)
+
+		err := downloadFileWithTask(task)
+		if err != nil {
+			return fmt.Errorf("failed to download %s: %w", task.FilePath, err)
+		}
+	}
+
+	fmt.Printf("\n✓ Sync complete!\n")
+	fmt.Printf("Downloaded %d files\n", len(tasks))
 
 	return nil
 }

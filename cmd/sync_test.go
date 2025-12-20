@@ -280,3 +280,44 @@ func TestSyncModelInitialization(t *testing.T) {
 		t.Errorf("expected completed to be 0, got %d", model.completed)
 	}
 }
+
+// TestFetchFileListUnpkg tests that UNPKG correctly returns files
+// Regression test for bug where Type field (MIME type) was incorrectly checked against "file"
+func TestFetchFileListUnpkg(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network-dependent test in short mode")
+	}
+
+	// Test with a small library
+	files, err := fetchFileList("jquery", "3.7.1", frontend_config.CDNUnpkg)
+	if err != nil {
+		t.Skipf("skipping due to network error: %v", err)
+	}
+
+	// UNPKG should return files (Type field contains MIME type, not "file"/"directory")
+	// jquery 3.7.1 should have > 100 files
+	if len(files) == 0 {
+		t.Error("expected UNPKG to return files, got 0 - this indicates the Type field bug has returned")
+	}
+
+	t.Logf("UNPKG returned %d files for jquery@3.7.1", len(files))
+
+	// Verify file structure
+	foundMinified := false
+	for _, f := range files {
+		if f.Path == "dist/jquery.min.js" {
+			foundMinified = true
+			if f.Size == 0 {
+				t.Error("expected file to have non-zero size")
+			}
+			expectedURL := "https://unpkg.com/jquery@3.7.1/dist/jquery.min.js"
+			if f.URL != expectedURL {
+				t.Errorf("expected URL %s, got %s", expectedURL, f.URL)
+			}
+		}
+	}
+
+	if !foundMinified {
+		t.Error("expected to find dist/jquery.min.js in UNPKG files")
+	}
+}
