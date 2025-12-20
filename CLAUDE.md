@@ -36,6 +36,7 @@ go test ./cmd -v -run "TestDelete"
 go test ./cmd -v -run "TestUpgrade"
 go test ./cmd -v -run "TestClean"
 go test ./cmd -v -run "TestInstall"
+go test ./cmd -v -run "TestBootstrapHtmx"
 
 # Run benchmarks
 go test ./pkgs/frontend_mgr -bench=. -benchtime=3x
@@ -78,6 +79,8 @@ The project uses **Cobra** for CLI framework with commands in `cmd/`:
 - `pkgver.go` + `pkgver_tui.go` - List/browse package versions (interactive TUI)
 - `get.go` + `get_test.go` - Download remote config files
 - `cache.go` - Cache management (stats, clear, clear-packages, clean)
+- `bootstrap.go` - Bootstrap new projects from frameworks
+- `bootstrap_xmlui.go` - Bootstrap XMLUI projects (downloads and extracts starter kit)
 
 Configuration is managed via **Viper**:
 - Default config: `$HOME/.smfaman.yaml`
@@ -419,6 +422,48 @@ Key bindings:
 - `s`: Save and quit
 - `q`/`Esc`: Quit without saving
 
+### Bootstrap Command (cmd/bootstrap.go + cmd/bootstrap_xmlui.go + cmd/bootstrap_htmx.go)
+
+Bootstrap new projects from various frameworks by downloading and setting up starter kits.
+
+**Main command (cmd/bootstrap.go):**
+- Parent command for framework-specific bootstrapping
+- Provides consistent interface across different frameworks
+- Currently supports: XMLUI, HTMX
+
+**XMLUI Subcommand (cmd/bootstrap_xmlui.go):**
+- Downloads the official XMLUI starter kit (xmlui-invoice)
+- Extracts to specified directory (defaults to current directory)
+- Includes: XMLUI Invoice app, XMLUI Engine, and test server
+- URL: `https://github.com/xmlui-org/xmlui-invoice/releases/latest/download/xmlui-invoice.zip`
+
+**HTMX Subcommand (cmd/bootstrap_htmx.go):**
+- Downloads an HTMX starter kit with Go backend
+- Extracts to specified directory (defaults to current directory)
+- Includes: HTMX library, sample templates, backend server, static assets
+- URL: `https://github.com/htmx-go/starter-template/releases/latest/download/htmx-starter.zip`
+
+Features:
+- Downloads starter kit from GitHub releases
+- Extracts ZIP archive with security checks (ZipSlip prevention)
+- Cross-platform support (Linux, macOS, Windows)
+- Provides platform-specific startup instructions
+- Cleans up temporary files automatically
+
+Usage:
+```bash
+smfaman bootstrap xmlui                    # Extract to current directory
+smfaman bootstrap xmlui --directory myapp  # Extract to specific directory
+smfaman bootstrap htmx                     # Extract HTMX starter
+smfaman bootstrap htmx --directory myapp   # Extract to specific directory
+```
+
+Implementation details:
+- Uses `downloadZipFile()` for HTTP download with progress indication
+- Uses `extractZip()` for safe ZIP extraction with path validation
+- Detects OS with `runtime.GOOS` for platform-specific instructions
+- Cleans up temp files with `defer os.Remove()`
+
 ## Development Notes
 
 ### Import Path
@@ -584,6 +629,29 @@ source ~/.zshrc
 
 # Use from anywhere
 smfaman --version
+```
+
+### Workflow 5: Bootstrapping a new framework project
+```bash
+# Bootstrap a new XMLUI project
+smfaman bootstrap xmlui
+
+# Or bootstrap an HTMX project
+smfaman bootstrap htmx
+
+# Or specify a custom directory
+smfaman bootstrap xmlui --directory my-xmlui-app
+smfaman bootstrap htmx --directory my-htmx-app
+
+# Navigate to the project
+cd my-xmlui-app  # or current directory if no --directory specified
+
+# Start the development server
+./start.sh  # On Mac/Linux/WSL
+# OR
+start.bat   # On Windows
+
+# Open browser to the displayed URL
 ```
 
 ## Key Dependencies
